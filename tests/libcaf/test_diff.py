@@ -128,10 +128,10 @@ def test_diff_nested_directory(temp_repo: Repository) -> None:
 
 
 def test_diff_nested_trees(temp_repo: Repository) -> None:
-    dir1 = temp_repo.working_dir / 'dir1'
+    dir1 = temp_repo.working_dir / 'dir3'
     dir1.mkdir()
-    file_a = dir1 / 'file_a.txt'
-    file_a.write_text('A1')
+    file_a = dir1 / 'file_ca.txt'
+    file_a.write_text('CA1')
 
     dir2 = temp_repo.working_dir / 'dir2'
     dir2.mkdir()
@@ -157,16 +157,16 @@ def test_diff_nested_trees(temp_repo: Repository) -> None:
     assert len(removed) == 0
 
     assert len(modified) == 2
-    
-    # Changed from index-based access (modified[0], modified[1]) to name-based lookup using next() with a generator expression. 
+
+    # Changed from index-based access (modified[0], modified[1]) to name-based lookup using next() with a generator expression.
     # This makes the test order-independent and more robust
     
     # Find directories by name instead of assuming order
-    dir1_diff = next(d for d in modified if d.record.name == 'dir1')
+    dir1_diff = next(d for d in modified if d.record.name == 'dir3')
     dir2_diff = next(d for d in modified if d.record.name == 'dir2')
     
     assert len(dir1_diff.children) == 1
-    assert dir1_diff.children[0].record.name == 'file_a.txt'
+    assert dir1_diff.children[0].record.name == 'file_ca.txt'
     assert isinstance(dir1_diff.children[0], ModifiedDiff)
 
     assert len(dir2_diff.children) == 2
@@ -177,10 +177,10 @@ def test_diff_nested_trees(temp_repo: Repository) -> None:
 
 
 def test_diff_moved_file_added_first(temp_repo: Repository) -> None:
-    dir1 = temp_repo.working_dir / 'dir1'
+    dir1 = temp_repo.working_dir / 'dir3'
     dir1.mkdir()
-    file_a = dir1 / 'file_a.txt'
-    file_a.write_text('A1')
+    file_a = dir1 / 'file_ca.txt'
+    file_a.write_text('CA1')
 
     dir2 = temp_repo.working_dir / 'dir2'
     dir2.mkdir()
@@ -204,12 +204,15 @@ def test_diff_moved_file_added_first(temp_repo: Repository) -> None:
 
     assert len(modified) == 2
 
-    assert modified[0].record.name == 'dir1'
-    assert len(modified[0].children) == 1
+    # Find directories by name instead of assuming order
+    dir1_diff = next(d for d in modified if d.record.name == 'dir3')
+    dir2_diff = next(d for d in modified if d.record.name == 'dir2')
 
-    modified_child = modified[0].children[0]
+    assert len(dir1_diff.children) == 1
+
+    modified_child = dir1_diff.children[0]
     assert isinstance(modified_child, MovedToDiff)
-    assert modified_child.record.name == 'file_a.txt'
+    assert modified_child.record.name == 'file_ca.txt'
 
     assert isinstance(modified_child.moved_to, MovedFromDiff)
     assert modified_child.moved_to.parent is not None
@@ -217,25 +220,24 @@ def test_diff_moved_file_added_first(temp_repo: Repository) -> None:
     assert len(modified_child.moved_to.parent.children) == 1
     assert modified_child.moved_to.record.name == 'file_c.txt'
 
-    assert modified[1].record.name == 'dir2'
-    assert len(modified[1].children) == 1
+    assert len(dir2_diff.children) == 1
 
-    modified_child = modified[1].children[0]
+    modified_child = dir2_diff.children[0]
     assert isinstance(modified_child, MovedFromDiff)
     assert modified_child.record.name == 'file_c.txt'
 
     assert isinstance(modified_child.moved_from, MovedToDiff)
     assert modified_child.moved_from.parent is not None
-    assert modified_child.moved_from.parent.record.name == 'dir1'
+    assert modified_child.moved_from.parent.record.name == 'dir3'
     assert len(modified_child.moved_from.parent.children) == 1
-    assert modified_child.moved_from.record.name == 'file_a.txt'
+    assert modified_child.moved_from.record.name == 'file_ca.txt'
 
 
 def test_diff_moved_file_removed_first(temp_repo: Repository) -> None:
-    dir1 = temp_repo.working_dir / 'dir1'
+    dir1 = temp_repo.working_dir / 'dir3'
     dir1.mkdir()
-    file_a = dir1 / 'file_a.txt'
-    file_a.write_text('A1')
+    file_a = dir1 / 'file_ca.txt'
+    file_a.write_text('CA1')
 
     dir2 = temp_repo.working_dir / 'dir2'
     dir2.mkdir()
@@ -259,7 +261,7 @@ def test_diff_moved_file_removed_first(temp_repo: Repository) -> None:
 
     assert len(modified) == 2
 
-    assert modified[0].record.name == 'dir1'
+    assert modified[0].record.name == 'dir3'
     assert len(modified[0].children) == 1
 
     modified_child = modified[0].children[0]
@@ -282,5 +284,5 @@ def test_diff_moved_file_removed_first(temp_repo: Repository) -> None:
     assert isinstance(modified_child.moved_to, MovedFromDiff)
     assert modified_child.moved_to.parent is not None
     assert len(modified_child.moved_to.parent.children) == 1
-    assert modified_child.moved_to.parent.record.name == 'dir1'
+    assert modified_child.moved_to.parent.record.name == 'dir3'
     assert modified_child.moved_to.record.name == 'file_c.txt'
