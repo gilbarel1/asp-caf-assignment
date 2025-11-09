@@ -157,18 +157,20 @@ def test_diff_nested_trees(temp_repo: Repository) -> None:
     assert len(removed) == 0
 
     assert len(modified) == 2
+    
+    # Find directories by name instead of assuming order
+    dir1_diff = next(d for d in modified if d.record.name == 'dir1')
+    dir2_diff = next(d for d in modified if d.record.name == 'dir2')
+    
+    assert len(dir1_diff.children) == 1
+    assert dir1_diff.children[0].record.name == 'file_a.txt'
+    assert isinstance(dir1_diff.children[0], ModifiedDiff)
 
-    assert modified[0].record.name == 'dir1'
-    assert len(modified[0].children) == 1
-    assert modified[0].children[0].record.name == 'file_a.txt'
-    assert isinstance(modified[0].children[0], ModifiedDiff)
-
-    assert modified[1].record.name == 'dir2'
-    assert len(modified[1].children) == 2
-    assert modified[1].children[0].record.name == 'file_b.txt'
-    assert isinstance(modified[1].children[0], RemovedDiff)
-    assert modified[1].children[1].record.name == 'file_c.txt'
-    assert isinstance(modified[1].children[1], AddedDiff)
+    assert len(dir2_diff.children) == 2
+    assert dir2_diff.children[0].record.name == 'file_b.txt'
+    assert isinstance(dir2_diff.children[0], RemovedDiff)
+    assert dir2_diff.children[1].record.name == 'file_c.txt'
+    assert isinstance(dir2_diff.children[1], AddedDiff)
 
 
 def test_diff_moved_file_added_first(temp_repo: Repository) -> None:
