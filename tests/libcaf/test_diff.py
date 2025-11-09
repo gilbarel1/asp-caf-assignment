@@ -158,6 +158,9 @@ def test_diff_nested_trees(temp_repo: Repository) -> None:
 
     assert len(modified) == 2
     
+    # Changed from index-based access (modified[0], modified[1]) to name-based lookup using next() with a generator expression. 
+    # This makes the test order-independent and more robust
+    
     # Find directories by name instead of assuming order
     dir1_diff = next(d for d in modified if d.record.name == 'dir1')
     dir2_diff = next(d for d in modified if d.record.name == 'dir2')
