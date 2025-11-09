@@ -261,10 +261,13 @@ def test_diff_moved_file_removed_first(temp_repo: Repository) -> None:
 
     assert len(modified) == 2
 
-    assert modified[0].record.name == 'dir3'
-    assert len(modified[0].children) == 1
+    # Find directories by name instead of assuming order
+    dir1_diff = next(d for d in modified if d.record.name == 'dir3')
+    dir2_diff = next(d for d in modified if d.record.name == 'dir2')
 
-    modified_child = modified[0].children[0]
+    assert len(dir1_diff.children) == 1
+
+    modified_child = dir1_diff.children[0]
     assert isinstance(modified_child, MovedFromDiff)
     assert modified_child.record.name == 'file_c.txt'
 
@@ -274,10 +277,9 @@ def test_diff_moved_file_removed_first(temp_repo: Repository) -> None:
     assert len(modified_child.moved_from.parent.children) == 1
     assert modified_child.moved_from.record.name == 'file_b.txt'
 
-    assert modified[1].record.name == 'dir2'
-    assert len(modified[1].children) == 1
+    assert len(dir2_diff.children) == 1
 
-    modified_child = modified[1].children[0]
+    modified_child = dir2_diff.children[0]
     assert isinstance(modified_child, MovedToDiff)
     assert modified_child.record.name == 'file_b.txt'
 
