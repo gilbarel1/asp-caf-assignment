@@ -11,7 +11,7 @@ from typing import Concatenate
 
 from . import Blob, Commit, Tree, TreeRecord, TreeRecordType
 from .constants import (DEFAULT_BRANCH, DEFAULT_REPO_DIR, HASH_CHARSET, HASH_LENGTH, HEADS_DIR, HEAD_FILE,
-                        OBJECTS_SUBDIR, REFS_DIR)
+                        OBJECTS_SUBDIR, REFS_DIR, TAGS_DIR)
 from .plumbing import hash_object, load_commit, load_tree, save_commit, save_file_content, save_tree
 from .ref import HashRef, Ref, RefError, SymRef, read_ref, write_ref
 
@@ -23,7 +23,9 @@ class RepositoryError(Exception):
 class RepositoryNotFoundError(RepositoryError):
     """Exception raised when a repository is not found."""
 
-
+class TagError(Exception):
+    """Exception raised for tag-related errors."""
+    
 @dataclass
 class Diff:
     """A class representing a difference between two tree records."""
@@ -132,6 +134,12 @@ class Repository:
 
         :return: The path to the heads directory."""
         return self.refs_dir() / HEADS_DIR
+
+    def tags_dir(self) -> Path:
+        """Get the path to the tags directory within the repository.
+
+        :return: The path to the tags directory."""
+        return self.refs_dir() / TAGS_DIR
 
     @staticmethod
     def requires_repo[**P, R](func: Callable[Concatenate['Repository', P], R]) -> \
@@ -545,6 +553,100 @@ class Repository:
                     parent_diff.children.append(local_diff)
 
         return top_level_diff.children
+    
+    @requires_repo
+    def create_tag(self, tag_name: str, commit_ref: HashRef | str | None = None) -> None:
+        """Create a new tag pointing to a specific commit.
+
+        :param tag_name: The name of the tag to create.
+        :param commit_ref: The commit reference to tag. If None, defaults to the current HEAD.
+        :raises ValueError: If the tag name is empty.
+        :raises TagError: If the tag already exists.
+        :raises RepositoryError: If the commit reference cannot be resolved.
+        :raises RepositoryNotFoundError: If the repository does not exist."""
+        if not tag_name:
+            msg = 'Tag name is required'
+            raise ValueError(msg)
+    
+        # Check if tag already exists
+        tag_path = self.tags_dir() / tag_name
+        if tag_path.exists():
+            msg = f'Tag "{tag_name}" already exists'
+            raise TagError(msg)
+    
+        # Resolve the commit reference (default to HEAD if not provided)
+        if commit_ref is None:
+            commit_ref = self.head_commit()
+            if commit_ref is None:
+                msg = 'No commits in repository to tag'
+                raise RepositoryError(msg)
+        else:
+            commit_ref = self.resolve_ref(commit_ref)
+            if commit_ref is None:
+                msg = f'Cannot resolve commit reference'
+                raise RepositoryError(msg)
+    
+        # Verify the commit exists
+        commit_path = self.objects_dir() / commit_ref[:2] / commit_ref
+        if not commit_path.exists():
+            msg = f'Commit {commit_ref} does not exist'
+            raise RepositoryError(msg)
+    
+        # Create tags directory if it doesn't exist
+        self.tags_dir().mkdir(parents=True, exist_ok=True)
+    
+        # Write the tag
+        write_ref(tag_path, commit_ref)
+
+    @requires_repo
+    def delete_tag(self, tag_name: str) -> None:
+        """Delete a tag from the repository.
+
+        :param tag_name: The name of the tag to delete.
+        :raises ValueError: If the tag name is empty.
+        :raises TagError: If the tag does not exist.
+        :raises RepositoryNotFoundError: If the repository does not exist."""
+        if not tag_name:
+            msg = 'Tag name is required'
+            raise ValueError(msg)
+    
+        tag_path = self.tags_dir() / tag_name
+        if not tag_path.exists():
+            msg = f'Tag "{tag_name}" does not exist'
+            raise TagError(msg)
+    
+        tag_path.unlink()
+
+    @requires_repo
+    def list_tags(self) -> list[tuple[str, HashRef]]:
+        """Get a list of all tags in the repository with their commit hashes.
+
+        :return: A list of tuples (tag_name, commit_hash).
+        :raises RepositoryNotFoundError: If the repository does not exist."""
+        tags_dir = self.tags_dir()
+    
+        # If tags directory doesn't exist, return empty list
+        if not tags_dir.exists():
+            return []
+    
+        tags: list[tuple[str, HashRef]] = []
+        for tag_file in tags_dir.iterdir():
+            if tag_file.is_file():
+                commit_ref = read_ref(tag_file)
+                if isinstance(commit_ref, HashRef):
+                    tags.append((tag_file.name, commit_ref))
+    
+        # Sort tags alphabetically by name
+        return sorted(tags, key=lambda x: x[0])
+
+    @requires_repo
+    def tag_exists(self, tag_name: str) -> bool:
+        """Check if a tag exists in the repository.
+
+        :param tag_name: The name of the tag to check.
+        :return: True if the tag exists, False otherwise.
+        :raises RepositoryNotFoundError: If the repository does not exist."""
+        return (self.tags_dir() / tag_name).exists()
 
     def head_file(self) -> Path:
         """Get the path to the HEAD file within the repository.

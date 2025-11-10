@@ -9,7 +9,7 @@ from libcaf.constants import DEFAULT_BRANCH
 from libcaf.plumbing import hash_file as plumbing_hash_file
 from libcaf.ref import SymRef
 from libcaf.repository import (AddedDiff, Diff, ModifiedDiff, MovedToDiff, RemovedDiff, Repository, RepositoryError,
-                               RepositoryNotFoundError)
+                               RepositoryNotFoundError, TagError)
 
 
 def _print_error(message: str) -> None:
@@ -275,3 +275,90 @@ def _print_diffs(diff_stack: MutableSequence[tuple[Sequence[Diff], int]]) -> Non
 
             if diff.children:
                 diff_stack.append((diff.children, indent + 3))
+
+def create_tag(**kwargs) -> int:
+    """Create a new tag pointing to a specific commit.
+    
+    :param tag_name: The name of the tag to create.
+    :param commit: Optional commit hash to tag. Defaults to HEAD.
+    :return: 0 on success, -1 on failure."""
+    repo = _repo_from_cli_kwargs(kwargs)
+    tag_name = kwargs.get('tag_name')
+    commit = kwargs.get('commit')
+    
+    # Treat empty string as None
+    if commit == '':
+        commit = None
+    
+    if not tag_name:
+        _print_error('Tag name is required.')
+        return -1
+    
+    try:
+        repo.create_tag(tag_name, commit)
+        
+        # Get the commit hash that was tagged
+        tagged_commit = repo.resolve_ref(commit) if commit else repo.head_commit()
+        
+        _print_success(f'Tag "{tag_name}" created at commit {tagged_commit}')
+        return 0
+    except RepositoryNotFoundError:
+        _print_error(f'No repository found at {repo.repo_path()}')
+        return -1
+    except (TagError, RepositoryError) as e:
+        _print_error(str(e))
+        return -1
+    except ValueError as e:
+        _print_error(str(e))
+        return -1
+
+
+def delete_tag(**kwargs) -> int:
+    """Delete a tag from the repository.
+    
+    :param tag_name: The name of the tag to delete.
+    :return: 0 on success, -1 on failure."""
+    repo = _repo_from_cli_kwargs(kwargs)
+    tag_name = kwargs.get('tag_name')
+    
+    if not tag_name:
+        _print_error('Tag name is required.')
+        return -1
+    
+    try:
+        repo.delete_tag(tag_name)
+        _print_success(f'Tag "{tag_name}" deleted.')
+        return 0
+    except RepositoryNotFoundError:
+        _print_error(f'No repository found at {repo.repo_path()}')
+        return -1
+    except (TagError, ValueError) as e:
+        _print_error(str(e))
+        return -1
+
+
+def tags(**kwargs) -> int:
+    """List all tags in the repository.
+    
+    :return: 0 on success, -1 on failure."""
+    repo = _repo_from_cli_kwargs(kwargs)
+    
+    try:
+        tag_list = repo.list_tags()
+        
+        if not tag_list:
+            _print_success('No tags found.')
+            return 0
+        
+        _print_success('Tags:\n')
+        
+        for tag_name, commit_hash in tag_list:
+            print(f'{tag_name:20} -> {commit_hash}')
+        
+        return 0
+    except RepositoryNotFoundError:
+        _print_error(f'No repository found at {repo.repo_path()}')
+        return -1
+    except RepositoryError as e:
+        _print_error(f'Repository error: {e}')
+        return -1
